@@ -1,20 +1,17 @@
-from fastapi import (
-    Depends,
-    FastAPI,
-    HTTPException,
-)
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from queue1 import summary_queue
-from services.auth import get_current_user
-from services.supabase import supabase
 from services.youtube import get_video_metadata
 from services.youtube_url import extract_video_id
-from services.transcript_pipeline import (
-    get_normalized_transcript,
-)
+from services.transcript_pipeline import get_normalized_transcript
+
+from queue1 import summary_queue
 from tasks import process_summary_job
+
+# You already have your Supabase client
+from services.supabase import supabase
+from fastapi import Depends
+from services.auth import get_current_user
 
 
 app = FastAPI(
@@ -23,58 +20,26 @@ app = FastAPI(
 )
 
 
-
-import os
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000",)
-
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        FRONTEND_URL,
-        "https://localhost:3000",
-        "https://127.0.0.1:3000"
-    ],
-    allow_credentials=True,
-    allow_methods=[
-        "GET",
-        "POST",
-        "OPTIONS",
-    ],
-    allow_headers=[
-        "Authorization",
-        "Content-Type",
-    ],
-)
-
-
-
 class VideoRequest(BaseModel):
     youtube_url: str
 
 
-
 @app.get("/health")
 def health_check():
-
     return {
         "status": "ok",
         "service": "backend",
     }
 
 
-
 @app.post("/api/videos")
-async def get_video(
-    video: VideoRequest,
-):
+async def get_video(video: VideoRequest):
 
     video_id = extract_video_id(
         video.youtube_url
     )
 
     if not video_id:
-
         raise HTTPException(
             status_code=400,
             detail="Invalid YouTube URL",
@@ -85,7 +50,6 @@ async def get_video(
     )
 
     if metadata is None:
-
         raise HTTPException(
             status_code=404,
             detail="YouTube video not found",
@@ -95,9 +59,7 @@ async def get_video(
 
 
 @app.get("/api/videos/{video_id}/transcript")
-def get_video_transcript(
-    video_id: str,
-):
+def get_video_transcript(video_id: str):
 
     try:
 
@@ -109,35 +71,31 @@ def get_video_transcript(
 
         raise HTTPException(
             status_code=500,
-            detail=(
-                "Transcript processing failed: "
-                f"{str(e)}"
-            ),
+            detail=f"Transcript processing failed: {str(e)}",
         )
 
 
-
 @app.post("/api/videos/{video_id}/summary")
-def create_summary_job(
+async def summarize_video(
     video_id: str,
     user_id: str = Depends(get_current_user),
 ):
 
     try:
 
-        job_response = (
-            supabase
-            .table("summary_jobs")
-            .insert({
-                "user_id": user_id,
-                "video_id": video_id,
-                "status": "queued",
-            })
-            .execute()
-        )
+        # --------------------------------
+        # 1. Create job in Supabase
+        # --------------------------------
+
+        job_response = supabase.table(
+            "summary_jobs"
+        ).insert({
+            "user_id": user_id,
+            "video_id": video_id,
+            "status": "queued",
+        }).execute()
 
         if not job_response.data:
-
             raise Exception(
                 "Failed to create summary job"
             )
@@ -150,7 +108,9 @@ def create_summary_job(
             f"Created summary job: {job_id}"
         )
 
-    
+        # --------------------------------
+        # 2. Put job into Redis
+        # --------------------------------
 
         summary_queue.enqueue(
             process_summary_job,
@@ -163,46 +123,33 @@ def create_summary_job(
             f"Queued summary job: {job_id}"
         )
 
+        # --------------------------------
+        # 3. Return immediately
+        # --------------------------------
+
         return {
             "job_id": job_id,
             "video_id": video_id,
             "status": "queued",
         }
 
-    except HTTPException:
-        raise
-
     except Exception as e:
-
-        print(
-            f"Failed to create job: {e}"
-        )
 
         raise HTTPException(
             status_code=500,
-            detail=(
-                "Failed to create summary job: "
-                f"{str(e)}"
-            ),
+            detail=f"Failed to create summary job: {str(e)}",
         )
 
-
-
 @app.get("/api/jobs/{job_id}")
-def get_job_status(
-    job_id: str,
-    user_id: str = Depends(get_current_user),
-):
+def get_job_status(job_id: str):
 
     try:
-
-
+        # Get the job from Supabase
         job_response = (
             supabase
             .table("summary_jobs")
             .select("*")
             .eq("id", job_id)
-            .eq("user_id", user_id)
             .single()
             .execute()
         )
@@ -210,14 +157,13 @@ def get_job_status(
         job = job_response.data
 
         if not job:
-
             raise HTTPException(
                 status_code=404,
                 detail="Job not found",
             )
 
-    
-
+        # If the job isn't completed yet,
+        # there is no summary to return.
         if job["status"] != "completed":
 
             return {
@@ -226,14 +172,15 @@ def get_job_status(
                 "video_id": job["video_id"],
             }
 
-        
+        # --------------------------------
+        # Job completed → get summary
+        # --------------------------------
 
         summary_response = (
             supabase
             .table("summaries")
             .select("*")
             .eq("job_id", job_id)
-            .eq("user_id", user_id)
             .single()
             .execute()
         )
@@ -241,13 +188,9 @@ def get_job_status(
         summary = summary_response.data
 
         if not summary:
-
             raise HTTPException(
                 status_code=500,
-                detail=(
-                    "Job completed but "
-                    "summary not found"
-                ),
+                detail="Job completed but summary not found",
             )
 
         return {
@@ -262,14 +205,7 @@ def get_job_status(
 
     except Exception as e:
 
-        print(
-            f"Failed to get job status: {e}"
-        )
-
         raise HTTPException(
             status_code=500,
-            detail=(
-                "Failed to get job status: "
-                f"{str(e)}"
-            ),
+            detail=f"Failed to get job status: {str(e)}",
         )

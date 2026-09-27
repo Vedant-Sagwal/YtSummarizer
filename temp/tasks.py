@@ -18,13 +18,18 @@ def process_summary_job(
 
         print(f"Starting job: {job_id}")
 
-    
+        # -----------------------------
+        # Mark processing
+        # -----------------------------
 
         update_job_status(
             job_id,
             "processing"
         )
 
+        # -----------------------------
+        # Get transcript
+        # -----------------------------
 
         print("Getting transcript...")
 
@@ -34,43 +39,35 @@ def process_summary_job(
 
         print("✓ Transcript obtained")
 
-        
+        # -----------------------------
+        # Convert transcript to text
+        # -----------------------------
 
         transcript_text = " ".join(
             segment["text"]
             for segment in transcript["segments"]
         )
 
+        # -----------------------------
+        # Extract important concepts
+        # -----------------------------
 
         print("Extracting concepts...")
 
+        concepts = extract_concepts(
+            transcript_text
+        )
 
-        try:
-
-            concepts = extract_concepts(
-                transcript_text
-            )
-
-        except Exception as e:
-
-            print(
-                f"Concept extraction failed: {e}"
-            )
-
-            concepts = []
+        concepts = concepts[:5]
 
         print("Detected concepts:")
         print(concepts)
 
-        concepts = concepts[:5]
-
-        
-
-    
+        # -----------------------------
+        # Get external context through MCP
+        # -----------------------------
 
         mcp_context = {}
-
-        video_context = transcript_text[:3000]
 
         for concept in concepts:
 
@@ -80,27 +77,26 @@ def process_summary_job(
 
             try:
 
+                video_context = transcript_text[:3000]
                 context = asyncio.run(
                     search_concept(
-                        concept=concept,
-                        video_context=video_context,
-                    )
+                    concept,
+                    video_context,
                 )
+)
 
                 mcp_context[concept] = context
-
-                print(
-                    f"✓ MCP context obtained for: "
-                    f"{concept}"
-                )
 
             except Exception as e:
 
                 print(
-                    f"⚠ MCP failed for "
+                    f"Failed to get context for "
                     f"{concept}: {e}"
                 )
 
+        # -----------------------------
+        # Build context for Gemini
+        # -----------------------------
 
         context_text = "\n\n".join(
             f"### {concept}\n{context}"
@@ -108,6 +104,9 @@ def process_summary_job(
             in mcp_context.items()
         )
 
+        # -----------------------------
+        # Generate enriched summary
+        # -----------------------------
 
         print("Generating summary...")
 
@@ -120,6 +119,9 @@ def process_summary_job(
 
         print("✓ Summary generated")
 
+        # -----------------------------
+        # Save summary
+        # -----------------------------
 
         print("Saving summary...")
 
@@ -134,6 +136,9 @@ def process_summary_job(
 
         print("✓ Summary saved")
 
+        # -----------------------------
+        # Mark completed
+        # -----------------------------
 
         update_job_status(
             job_id,

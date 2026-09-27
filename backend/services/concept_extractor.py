@@ -1,69 +1,88 @@
+import json
+import os
+from typing import List
+
+from dotenv import load_dotenv
+from google import genai
 from pydantic import BaseModel
-from services.summarizer import client
 
 
-class ConceptList(BaseModel):
-    concepts: list[str]
+load_dotenv()
 
 
-def extract_concepts(transcript_text: str) -> list[str]:
+client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY")
+)
+
+
+class ConceptResult(BaseModel):
+    concepts: List[str]
+
+
+def extract_concepts(transcript_text: str) -> List[str]:
+
+    print("========== CONCEPT EXTRACTION ==========")
+    print(f"Transcript length: {len(transcript_text)}")
 
     prompt = f"""
-You are analyzing a YouTube video.
+Extract the most important technical, conceptual, or thematic
+concepts discussed in this YouTube transcript.
 
-Identify the 3 to 5 most important concepts discussed
-in this transcript.
+Rules:
 
-The concepts can be ANY meaningful topic, including:
+1. Return at most 5 concepts.
+2. Only use concepts actually present in the transcript.
+3. Do not invent concepts.
+4. Keep each concept short.
+5. Return JSON only.
 
-- ideas
-- techniques
-- technologies
-- products
-- companies
-- tools
-- frameworks
-- scientific concepts
-- business concepts
-- self-improvement concepts
-- domain-specific terminology
+Example:
 
-For example, if the video says:
-
-"Motivation isn't given. It is built through consistent
-action. You need discipline and consistent progress."
-
-Good concepts would be:
-
-- Motivation
-- Discipline
-- Consistent Action
-- Habit Formation
-
-The concepts MUST come from the transcript.
-
-Do not invent unrelated concepts.
+{{
+    "concepts": [
+        "Motivation",
+        "Discipline",
+        "Consistent Action"
+    ]
+}}
 
 TRANSCRIPT:
 
-{transcript_text[:15000]}
+{transcript_text}
 """
 
-    response = client.models.generate_content(
-        model="gemini-3.5-flash-lite",
-        contents=prompt,
-        config={
-            "response_mime_type": "application/json",
-            "response_schema": ConceptList,
-        },
-    )
+    try:
 
-    print("========== CONCEPT MODEL RESPONSE ==========")
-    print(response.text)
-    print("============================================")
+        response = client.models.generate_content(
+            model="gemini-3.5-flash-lite",
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": ConceptResult,
+            },
+        )
 
-    result = ConceptList.model_validate_json(
-        response.text
-    )
+        print("========== CONCEPT MODEL RESPONSE ==========")
+        print(response.text)
+        print("============================================")
 
-    return result.concepts[:5]
+        result = ConceptResult.model_validate_json(
+            response.text
+        )
+
+        concepts = result.concepts[:5]
+
+        print("FINAL CONCEPTS:")
+        print(concepts)
+
+        return concepts
+
+    except Exception as e:
+
+        print(
+            f"Concept extraction failed: {e}"
+        )
+
+        # Do not kill the entire summary job just because
+        # optional concept extraction failed.
+        return []
