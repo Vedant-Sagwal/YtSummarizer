@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
 
+import ThemeToggle from "@/components/themeToggle";
+
 type VideoMetadata = {
   video_id: string;
   title?: string;
@@ -232,6 +234,7 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-black text-white">
+      <ThemeToggle />
       <div className="mx-auto max-w-5xl px-6 py-10">
 
 
