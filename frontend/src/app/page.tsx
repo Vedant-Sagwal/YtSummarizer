@@ -4,345 +4,212 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
-import { apiFetch } from "@/lib/api";
 
-interface VideoMetadata {
-  video_id?: string;
-  id?: string;
-  title?: string;
-  channel_title?: string;
-  channel?: string;
-  description?: string;
-  thumbnail?: string;
-  thumbnail_url?: string;
-}
-
-interface SummaryJob {
-  job_id?: string;
-  id?: string;
-  status?: string;
-  message?: string;
-}
-
-export default function Dashboard() {
+export default function HomePage() {
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  const [youtubeUrl, setYoutubeUrl] = useState("");
-
-  const [video, setVideo] = useState<VideoMetadata | null>(null);
-
-  const [job, setJob] = useState<SummaryJob | null>(null);
-
-  const [error, setError] = useState("");
-  const [loadingVideo, setLoadingVideo] = useState(false);
-  const [loadingSummary, setLoadingSummary] = useState(false);
-
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
-    async function loadUser() {
+    // Load saved theme
+    const savedTheme = localStorage.getItem("theme");
+
+    if (savedTheme === "dark") {
+      document.documentElement.classList.add("dark");
+      setDarkMode(true);
+    } else {
+      document.documentElement.classList.remove("dark");
+      setDarkMode(false);
+    }
+
+    // Check authentication
+    async function checkUser() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (!user) {
-        router.push("/");
-        return;
-      }
-
-      setEmail(user.email ?? "");
-      setLoading(false);
+      setLoggedIn(!!user);
     }
 
-    loadUser();
-  }, [router]);
+    checkUser();
+  }, []);
 
-  // --------------------------------------------------
-  // Logout
-  // --------------------------------------------------
+  // function toggleTheme() {
+  //   const newDarkMode = !darkMode;
 
-  async function logout() {
-    await supabase.auth.signOut();
-    router.push("/");
-  }
+  //   setDarkMode(newDarkMode);
 
+  //   if (newDarkMode) {
+  //     document.documentElement.classList.add("dark");
+  //     localStorage.setItem("theme", "dark");
+  //   } else {
+  //     document.documentElement.classList.remove("dark");
+  //     localStorage.setItem("theme", "light");
+  //   }
+  // }
 
-  async function getVideo() {
-    setError("");
-    setVideo(null);
-    setJob(null);
-
-    if (!youtubeUrl.trim()) {
-      setError("Please enter a YouTube URL.");
-      return;
-    }
-
-    try {
-      setLoadingVideo(true);
-
-      const response = await apiFetch("/api/videos", {
-        method: "POST",
-        body: JSON.stringify({
-          youtube_url: youtubeUrl.trim(),
-        }),
-      });
-
-      const data = await response.json();
-
-      console.log("Video metadata:", data);
-
-      setVideo(data);
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to get video information."
-      );
-    } finally {
-      setLoadingVideo(false);
+  function handleGetStarted() {
+    if (loggedIn) {
+      router.push("/dashboard");
+    } else {
+      router.push("/login");
     }
   }
-
-
-  async function generateSummary() {
-    setError("");
-
-    const videoId =
-      video?.video_id ??
-      video?.id;
-
-    if (!videoId) {
-      setError("Video ID not found.");
-      return;
-    }
-
-    try {
-      setLoadingSummary(true);
-
-      console.log("Generating summary for:", videoId);
-
-      const response = await apiFetch(
-        `/api/videos/${videoId}/summary`,
-        {
-          method: "POST",
-        }
-      );
-
-      const data = await response.json();
-
-      console.log("Summary job:", data);
-
-      setJob(data);
-    } catch (err) {
-      console.error(err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to generate summary."
-      );
-    } finally {
-      setLoadingSummary(false);
-    }
-  }
-
-
-  if (loading) {
-    return (
-      <main className="p-8">
-        <p>Loading...</p>
-      </main>
-    );
-  }
-
-  
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="mx-auto max-w-3xl">
+    <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)] transition-colors">
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-6">
 
-        {/* Header */}
-
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">
-              YouTube AI Summarizer
-            </h1>
-
-            <p className="mt-2 text-gray-500">
-              Logged in as: {email}
-            </p>
-          </div>
+        {/* Navbar */}
+        <nav className="flex items-center justify-between py-6">
 
           <button
-            className="rounded bg-black px-4 py-2 text-white"
-            onClick={logout}
-          >
-            Logout
+            onClick={() => {router.push("/")}}
+            className="text-2xl font-bold transition hover:opacity-70">
+            Auxiliator
           </button>
-        </div>
 
-        
+          <div className="flex items-center gap-4">
 
-        <div className="mt-12 rounded-lg border p-6">
+            {/* Dashboard / Login */}
+            <button
+              onClick={() =>
+                loggedIn
+                  ? router.push("/dashboard")
+                  : router.push("/login")
+              }
+              className="
+                rounded-lg
+                border
+                border-[var(--foreground)]
+                px-5
+                py-2.5
+                text-sm
+                font-medium
+                transition
+                hover:opacity-70
+              "
+            >
+              {loggedIn ? "Dashboard" : "Login"}
+            </button>
 
-          <h2 className="text-xl font-semibold">
-            Summarize a YouTube Video
-          </h2>
+            
+          </div>
 
-          <p className="mt-2 text-sm text-gray-500">
-            Paste a YouTube video URL below.
+        </nav>
+
+        {/* Hero */}
+        <section className="flex flex-1 flex-col items-center justify-center text-center">
+
+          <div
+            className="
+              mb-6
+              rounded-full
+              border
+              border-[var(--foreground)]
+              px-4
+              py-2
+              text-sm
+              opacity-90
+            "
+          >
+            AI-powered YouTube summarization
+          </div>
+
+          <h1 className="max-w-4xl text-5xl font-bold tracking-tight sm:text-6xl">
+            Understand YouTube videos
+
+            <span className="block opacity-60">
+              in seconds.
+            </span>
+          </h1>
+
+          <p className="mt-6 max-w-2xl text-lg opacity-70">
+            Turn long YouTube videos into structured summaries,
+            chapters, key concepts, actionable insights and
+            important quotes.
           </p>
 
-          <div className="mt-6 flex gap-3">
+          {/* CTA */}
+          <button
+            onClick={handleGetStarted}
+            className="
+              mt-10
+              rounded-xl
+              bg-[var(--button)]
+              px-7
+              py-3
+              font-semibold
+              text-[var(--button-text)]
+              shadow-md
+              transition
+              hover:scale-[1.02]
+              hover:opacity-90
+            "
+          >
+            {loggedIn ? "Go to Dashboard →" : "Get Started →"}
+          </button>
 
-            <input
-              className="flex-1 rounded border p-3"
-              type="text"
-              placeholder="https://www.youtube.com/watch?v=..."
-              value={youtubeUrl}
-              onChange={(e) =>
-                setYoutubeUrl(e.target.value)
-              }
-              disabled={
-                loadingVideo ||
-                loadingSummary
-              }
+          {/* Features */}
+          <div className="mt-20 grid w-full max-w-4xl gap-5 sm:grid-cols-3">
+
+            <Feature
+              title="Smart Summaries"
+              description="Get the important information without watching the entire video."
             />
 
-            <button
-              className="rounded bg-black px-5 py-3 text-white disabled:opacity-50"
-              onClick={getVideo}
-              disabled={
-                loadingVideo ||
-                loadingSummary
-              }
-            >
-              {loadingVideo
-                ? "Loading..."
-                : "Get Video"}
-            </button>
+            <Feature
+              title="Key Concepts"
+              description="Automatically identify the important ideas discussed in the video."
+            />
+
+            <Feature
+              title="Chapters"
+              description="Navigate the video through meaningful timestamped sections."
+            />
 
           </div>
 
-        </div>
+        </section>
 
-        
-
-        {error && (
-          <div className="mt-6 rounded border border-red-400 bg-red-50 p-4 text-red-700">
-            {error}
-          </div>
-        )}
-
-        
-
-        {video && (
-          <div className="mt-6 rounded-lg border p-6">
-
-            <h2 className="text-xl font-semibold">
-              Video
-            </h2>
-
-            <div className="mt-4">
-
-              {video.thumbnail_url && (
-                <img
-                  src={video.thumbnail_url}
-                  alt="Video thumbnail"
-                  className="mb-4 max-w-sm rounded"
-                />
-              )}
-
-              {video.thumbnail && (
-                <img
-                  src={video.thumbnail}
-                  alt="Video thumbnail"
-                  className="mb-4 max-w-sm rounded"
-                />
-              )}
-
-              <p className="font-medium">
-                {video.title ?? "YouTube Video"}
-              </p>
-
-              {(video.channel_title ||
-                video.channel) && (
-                <p className="mt-1 text-sm text-gray-500">
-                  {video.channel_title ??
-                    video.channel}
-                </p>
-              )}
-
-            </div>
-
-            <button
-              className="mt-6 rounded bg-black px-5 py-3 text-white disabled:opacity-50"
-              onClick={generateSummary}
-              disabled={loadingSummary}
-            >
-              {loadingSummary
-                ? "Creating Summary..."
-                : "Generate Summary"}
-            </button>
-
-          </div>
-        )}
-
-        
-
-        {job && (
-          <div className="mt-6 rounded-lg border p-6">
-
-            <h2 className="text-xl font-semibold">
-              Summary Job
-            </h2>
-
-            <div className="mt-4 space-y-2">
-
-              {job.job_id && (
-                <p>
-                  <span className="font-medium">
-                    Job ID:
-                  </span>{" "}
-                  {job.job_id}
-                </p>
-              )}
-
-              {job.id && !job.job_id && (
-                <p>
-                  <span className="font-medium">
-                    Job ID:
-                  </span>{" "}
-                  {job.id}
-                </p>
-              )}
-
-              {job.status && (
-                <p>
-                  <span className="font-medium">
-                    Status:
-                  </span>{" "}
-                  {job.status}
-                </p>
-              )}
-
-              {job.message && (
-                <p className="text-gray-500">
-                  {job.message}
-                </p>
-              )}
-
-            </div>
-
-          </div>
-        )}
+        {/* Footer */}
+        <footer className="py-6 text-center text-sm opacity-50">
+          Built by Vedant Sagwal
+        </footer>
 
       </div>
     </main>
+  );
+}
+
+
+function Feature({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div
+      className="
+        rounded-xl
+        border
+        border-[var(--foreground)]
+        p-6
+        text-left
+        transition
+        hover:-translate-y-1
+      "
+    >
+      <h2 className="text-lg font-semibold">
+        {title}
+      </h2>
+
+      <p className="mt-2 text-sm opacity-65">
+        {description}
+      </p>
+    </div>
   );
 }

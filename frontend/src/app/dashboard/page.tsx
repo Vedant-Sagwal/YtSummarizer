@@ -6,8 +6,6 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
 
-import ThemeToggle from "@/components/themeToggle";
-
 type VideoMetadata = {
   video_id: string;
   title?: string;
@@ -54,6 +52,7 @@ export default function Dashboard() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
+  const [darkMode, setDarkMode] = useState(false);
 
   const [youtubeUrl, setYoutubeUrl] = useState("");
 
@@ -72,11 +71,11 @@ export default function Dashboard() {
   const [creatingSummary, setCreatingSummary] =
     useState(false);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  
-
+  /*
+   * Authentication + theme
+   */
   useEffect(() => {
     async function loadUser() {
       const {
@@ -84,7 +83,7 @@ export default function Dashboard() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        router.push("/");
+        router.replace("/login");
         return;
       }
 
@@ -92,8 +91,31 @@ export default function Dashboard() {
     }
 
     loadUser();
-  }, [router]);
 
+    const savedTheme =
+      localStorage.getItem("theme");
+
+    if (savedTheme === "dark") {
+      document.documentElement.classList.add("dark");
+      setDarkMode(true);
+    } else {
+      document.documentElement.classList.remove("dark");
+      setDarkMode(false);
+    }
+  }, [router]);
+  // function toggleTheme() {
+  //   const newDarkMode = !darkMode;
+
+  //   setDarkMode(newDarkMode);
+
+  //   if (newDarkMode) {
+  //     document.documentElement.classList.add("dark");
+  //     localStorage.setItem("theme", "dark");
+  //   } else {
+  //     document.documentElement.classList.remove("dark");
+  //     localStorage.setItem("theme", "light");
+  //   }
+    // }
 
   useEffect(() => {
     if (!job?.job_id) {
@@ -120,9 +142,7 @@ export default function Dashboard() {
           setJob(data);
 
           if (data.status === "completed") {
-            setSummary(
-              data.summary ?? null,
-            );
+            setSummary(data.summary ?? null);
           }
 
           if (data.status === "failed") {
@@ -146,14 +166,18 @@ export default function Dashboard() {
     };
   }, [job?.job_id, job?.status]);
 
-
+  /*
+   * Logout
+   */
   async function handleLogout() {
     await supabase.auth.signOut();
 
-    router.push("/");
+    router.replace("/");
   }
 
-
+  /*
+   * Get YouTube video
+   */
   async function handleGetVideo() {
     setError("");
     setVideo(null);
@@ -161,9 +185,7 @@ export default function Dashboard() {
     setJob(null);
 
     if (!youtubeUrl.trim()) {
-      setError(
-        "Please enter a YouTube URL.",
-      );
+      setError("Please enter a YouTube URL.");
       return;
     }
 
@@ -197,7 +219,9 @@ export default function Dashboard() {
     }
   }
 
-
+  /*
+   * Generate summary
+   */
   async function handleGenerateSummary() {
     if (!video?.video_id) {
       return;
@@ -233,34 +257,59 @@ export default function Dashboard() {
   }
 
   return (
-    <main className="min-h-screen bg-black text-white">
-      <ThemeToggle />
+    <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)] transition-colors">
+
       <div className="mx-auto max-w-5xl px-6 py-10">
 
-
+        {/* Header */}
         <div className="mb-10 flex items-center justify-between">
 
           <div>
-            <h1 className="text-4xl font-bold">
-              YouTube AI Summarizer
-            </h1>
+          <button
+            onClick={() => {router.push("/")}}
+            className="text-4xl font-bold transition hover:opacity-70">
+            Auxiliator          
+          </button>
 
-            <p className="mt-2 text-gray-400">
+            <p className="mt-2 opacity-60">
               Logged in as {email}
             </p>
           </div>
 
-          <button
-            onClick={handleLogout}
-            className="rounded bg-white px-5 py-2 font-medium text-black hover:bg-gray-200"
-          >
-            Logout
-          </button>
+          <div className="flex items-center gap-3">
+
+            
+
+            <button
+              onClick={handleLogout}
+              className="
+                rounded-lg
+                bg-[var(--button)]
+                px-5
+                py-2.5
+                font-medium
+                text-[var(--button-text)]
+                transition
+                hover:opacity-90
+              "
+            >
+              Logout
+            </button>
+
+          </div>
 
         </div>
 
-
-        <section className="rounded-xl border border-gray-800 bg-gray-950 p-6">
+        {/* Input */}
+        <section
+          className="
+            rounded-xl
+            border
+            border-[var(--foreground)]
+            bg-[var(--card)]
+            p-6
+          "
+        >
 
           <h2 className="mb-4 text-xl font-semibold">
             Summarize a YouTube video
@@ -269,7 +318,16 @@ export default function Dashboard() {
           <div className="flex gap-3">
 
             <input
-              className="flex-1 rounded-lg border border-gray-700 bg-black px-4 py-3 text-white outline-none focus:border-gray-400"
+              className="
+                flex-1
+                rounded-lg
+                border
+                border-[var(--foreground)]
+                bg-transparent
+                px-4
+                py-3
+                outline-none
+              "
               type="text"
               placeholder="https://www.youtube.com/watch?v=..."
               value={youtubeUrl}
@@ -281,7 +339,16 @@ export default function Dashboard() {
             <button
               onClick={handleGetVideo}
               disabled={loadingVideo}
-              className="rounded-lg bg-white px-6 py-3 font-medium text-black disabled:cursor-not-allowed disabled:opacity-50"
+              className="
+                rounded-lg
+                bg-[var(--button)]
+                px-6
+                py-3
+                font-medium
+                text-[var(--button-text)]
+                disabled:cursor-not-allowed
+                disabled:opacity-50
+              "
             >
               {loadingVideo
                 ? "Loading..."
@@ -298,9 +365,18 @@ export default function Dashboard() {
 
         </section>
 
-
+        {/* Video */}
         {video && (
-          <section className="mt-8 rounded-xl border border-gray-800 bg-gray-950 p-6">
+          <section
+            className="
+              mt-8
+              rounded-xl
+              border
+              border-[var(--foreground)]
+              bg-[var(--card)]
+              p-6
+            "
+          >
 
             <div className="flex gap-6">
 
@@ -319,13 +395,13 @@ export default function Dashboard() {
                 </h2>
 
                 {video.channel_title && (
-                  <p className="mt-2 text-gray-400">
+                  <p className="mt-2 opacity-60">
                     {video.channel_title}
                   </p>
                 )}
 
                 {video.published_at && (
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm opacity-50">
                     {new Date(
                       video.published_at,
                     ).toLocaleDateString()}
@@ -337,7 +413,18 @@ export default function Dashboard() {
                     handleGenerateSummary
                   }
                   disabled={creatingSummary}
-                  className="mt-6 rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="
+                    mt-6
+                    rounded-lg
+                    bg-blue-600
+                    px-6
+                    py-3
+                    font-medium
+                    text-white
+                    hover:bg-blue-500
+                    disabled:cursor-not-allowed
+                    disabled:opacity-50
+                  "
                 >
                   {creatingSummary
                     ? "Creating job..."
@@ -351,9 +438,18 @@ export default function Dashboard() {
           </section>
         )}
 
-
+        {/* Job status */}
         {job && (
-          <section className="mt-8 rounded-xl border border-gray-800 bg-gray-950 p-6">
+          <section
+            className="
+              mt-8
+              rounded-xl
+              border
+              border-[var(--foreground)]
+              bg-[var(--card)]
+              p-6
+            "
+          >
 
             <h2 className="text-xl font-semibold">
               Summary Status
@@ -378,27 +474,25 @@ export default function Dashboard() {
             </div>
 
             {job.status === "queued" && (
-              <p className="mt-3 text-gray-400">
-                Your summary job is waiting
-                in the Redis queue.
+              <p className="mt-3 opacity-60">
+                Your summary job is waiting in the Redis queue.
               </p>
             )}
 
             {job.status === "processing" && (
-              <p className="mt-3 text-gray-400">
-                Worker is generating your
-                summary...
+              <p className="mt-3 opacity-60">
+                Worker is generating your summary...
               </p>
             )}
 
             {job.status === "completed" && (
-              <p className="mt-3 text-green-400">
+              <p className="mt-3 text-green-500">
                 Summary generated successfully.
               </p>
             )}
 
             {job.status === "failed" && (
-              <p className="mt-3 text-red-400">
+              <p className="mt-3 text-red-500">
                 Summary generation failed.
               </p>
             )}
@@ -406,29 +500,42 @@ export default function Dashboard() {
           </section>
         )}
 
-
-
+        {/* Summary */}
         {summary && (
           <section className="mt-8 space-y-8">
 
-            
-
-            <div className="rounded-xl border border-gray-800 bg-gray-950 p-6">
+            {/* Executive Summary */}
+            <div
+              className="
+                rounded-xl
+                border
+                border-[var(--foreground)]
+                bg-[var(--card)]
+                p-6
+              "
+            >
 
               <h2 className="text-2xl font-semibold">
                 Executive Summary
               </h2>
 
-              <p className="mt-4 leading-7 text-gray-300">
+              <p className="mt-4 leading-7 opacity-80">
                 {summary.executive_summary}
               </p>
 
             </div>
 
-            
-
+            {/* Chapters */}
             {summary.chapters.length > 0 && (
-              <div className="rounded-xl border border-gray-800 bg-gray-950 p-6">
+              <div
+                className="
+                  rounded-xl
+                  border
+                  border-[var(--foreground)]
+                  bg-[var(--card)]
+                  p-6
+                "
+              >
 
                 <h2 className="text-2xl font-semibold">
                   Chapters
@@ -440,10 +547,10 @@ export default function Dashboard() {
                     (chapter, index) => (
                       <div
                         key={index}
-                        className="border-l-2 border-gray-700 pl-4"
+                        className="border-l-2 border-[var(--foreground)] pl-4"
                       >
 
-                        <p className="text-sm text-blue-400">
+                        <p className="text-sm text-blue-500">
                           {chapter.timestamp}
                         </p>
 
@@ -451,7 +558,7 @@ export default function Dashboard() {
                           {chapter.title}
                         </h3>
 
-                        <p className="mt-2 text-gray-400">
+                        <p className="mt-2 opacity-60">
                           {chapter.summary}
                         </p>
 
@@ -464,10 +571,17 @@ export default function Dashboard() {
               </div>
             )}
 
-            
-
+            {/* Key Concepts */}
             {summary.key_concepts.length > 0 && (
-              <div className="rounded-xl border border-gray-800 bg-gray-950 p-6">
+              <div
+                className="
+                  rounded-xl
+                  border
+                  border-[var(--foreground)]
+                  bg-[var(--card)]
+                  p-6
+                "
+              >
 
                 <h2 className="text-2xl font-semibold">
                   Key Concepts
@@ -479,10 +593,10 @@ export default function Dashboard() {
                     (concept, index) => (
                       <div
                         key={index}
-                        className="rounded-lg border border-gray-800 p-4"
+                        className="rounded-lg border border-[var(--foreground)] p-4"
                       >
 
-                        <p className="text-sm text-blue-400">
+                        <p className="text-sm text-blue-500">
                           {concept.timestamp}
                         </p>
 
@@ -490,7 +604,7 @@ export default function Dashboard() {
                           {concept.concept}
                         </h3>
 
-                        <p className="mt-2 text-sm leading-6 text-gray-400">
+                        <p className="mt-2 text-sm leading-6 opacity-60">
                           {concept.explanation}
                         </p>
 
@@ -503,16 +617,23 @@ export default function Dashboard() {
               </div>
             )}
 
-            
-
+            {/* Actionable Insights */}
             {summary.actionable_insights.length > 0 && (
-              <div className="rounded-xl border border-gray-800 bg-gray-950 p-6">
+              <div
+                className="
+                  rounded-xl
+                  border
+                  border-[var(--foreground)]
+                  bg-[var(--card)]
+                  p-6
+                "
+              >
 
                 <h2 className="text-2xl font-semibold">
                   Actionable Insights
                 </h2>
 
-                <ul className="mt-5 list-disc space-y-3 pl-6 text-gray-300">
+                <ul className="mt-5 list-disc space-y-3 pl-6 opacity-80">
 
                   {summary.actionable_insights.map(
                     (insight, index) => (
@@ -527,10 +648,17 @@ export default function Dashboard() {
               </div>
             )}
 
-            
-
+            {/* Key Quotes */}
             {summary.key_quotes.length > 0 && (
-              <div className="rounded-xl border border-gray-800 bg-gray-950 p-6">
+              <div
+                className="
+                  rounded-xl
+                  border
+                  border-[var(--foreground)]
+                  bg-[var(--card)]
+                  p-6
+                "
+              >
 
                 <h2 className="text-2xl font-semibold">
                   Key Quotes
@@ -542,14 +670,14 @@ export default function Dashboard() {
                     (quote, index) => (
                       <blockquote
                         key={index}
-                        className="border-l-2 border-gray-600 pl-4"
+                        className="border-l-2 border-[var(--foreground)] pl-4"
                       >
 
-                        <p className="italic text-gray-300">
+                        <p className="italic opacity-80">
                           "{quote.quote}"
                         </p>
 
-                        <p className="mt-2 text-sm text-gray-500">
+                        <p className="mt-2 text-sm opacity-50">
                           {quote.timestamp}
                         </p>
 
