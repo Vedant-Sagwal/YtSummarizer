@@ -1,5 +1,13 @@
 # Youtube Video Summarizer (With transcipt Generation using Whisper Flow)
 
+## About
+
+### It is a Youtube Video Summarizer. One day before exam and you do not want to watch the whole video, here this summarizer comes into play, summarize the video just by passing the link of the video and get instant summary with some additional information also(for relevant topics)
+
+### Using Whisper Flow to generate the transcript for the video and mcp tool layer to provide tooling to gemini(llm used in this)
+
+### Will Deploy Soon on AWS, it will be a long process as need to configure redis, worker also, so will do in some time.
+
 ## Example
 
 ![Image 1](./assets/image4.png)
